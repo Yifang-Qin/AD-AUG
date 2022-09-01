@@ -3,17 +3,6 @@ import copy
 import pandas as pd
 import numpy as np
 import random
-import time
-# import datetime
-
-# def load_data(path, col_names):
-#     all_data = pd.read_csv(path, sep='::', header=None, names=col_names)
-#     all_data = all_data.loc[:, ['uid', 'sid', 'time']]
-#     # print(all_data['uid'])
-#     all_data['uid'] -= 1
-#     all_data['sid'] -= 1
-#     # all_data.sort_values(by='time', ascending=True)
-#     return all_data
 
 def data_split(all_data, train_ratio, valid_ratio, test_ratio):
     data_group = all_data.groupby('uid')
@@ -25,26 +14,16 @@ def data_split(all_data, train_ratio, valid_ratio, test_ratio):
         user = pd.unique(group.uid)[0]
         num_items_user = len(group)
 
-        # if num_items_user < 10:
-        #     print('<10 Error')
-        #     continue
-
         num_train = int(train_ratio * num_items_user)
         num_valid = int(valid_ratio * num_items_user)
         group = group.sort_values(by='time', ascending=True)
         train_idx = np.zeros(num_items_user, dtype='bool')
         valid_idx = np.zeros(num_items_user, dtype='bool')
         test_idx = np.zeros(num_items_user, dtype='bool')
-        #
-        # train_idx[:num_train] = True
-        # valid_idx[num_train:num_train+num_valid] = True
-        # test_idx[num_train+num_valid:] = True
 
         va_te = [idx for idx in range(num_train, num_items_user)]
         random.shuffle(va_te)
         train_idx[:num_train] = True
-        # valid_idx[num_train:num_train+num_valid] = True
-        # test_idx[num_train+num_valid:] = True
         valid_idx[va_te[:num_valid]] = True
         test_idx[va_te[num_valid:]] = True
 
@@ -75,25 +54,10 @@ def data_split(all_data, train_ratio, valid_ratio, test_ratio):
 def remap_user_item(data, mp_user, mp_item):
     dd = data.copy()
     for i in range(len(data)):
-        # dd.iloc[i].uid = mp_user[data.iloc[i].uid]
-        # dd.iloc[i].sid = mp_item[data.iloc[i].sid]
         dd.loc[i, 'uid'] = mp_user[dd.loc[i, 'uid']]
         dd.loc[i, 'sid'] = mp_item[dd.loc[i, 'sid']]
     return dd
 
-# def to_df(file_path):
-#   with open(file_path, 'r') as fin:
-#     df = {}
-#     i = 0
-#     for line in fin:
-#         df[i] = eval(line)
-#         i += 1
-#
-#     df = pd.DataFrame.from_dict(df, orient='index')
-#     # df['time'] = pd.to_datetime(df['reviewTime'], format='%m %d, %Y')#.dt.timee
-#     df_ = df.rename(columns={'reviewerID': 'uid', 'asin': 'sid', 'unixReviewTime': 'time'})
-#     # print(df_)
-#     return df_
 
 def to_df(file_path):
     df = pd.read_json(file_path, lines=True)
@@ -112,9 +76,6 @@ def data_filter(oridata, userThreshold, itemThreshold):
         indexItem = data[['time', 'sid']].groupby('sid').count() >= itemThreshold
         item = set(indexItem[indexItem['time'] == True].index)
         data = data[data['sid'].isin(item)]
-        # if data.shape[0] != shape:
-        #     shape = data.shape[0]
-        #     flag = True
 
         indexUser = data[['time', 'uid']].groupby('uid').count() >= userThreshold
         user = set(indexUser[indexUser['time'] == True].index)
@@ -125,7 +86,6 @@ def data_filter(oridata, userThreshold, itemThreshold):
     return data
 
 if __name__ == '__main__':
-    # file_path = './ml-1m/ratings.dat'
     root_path = ''
     # file_path = root_path + 'amazon/reviews_Digital_Music_5.json'
     file_path = root_path + 'amazon_beauty/reviews_Beauty_5.json'
@@ -136,25 +96,8 @@ if __name__ == '__main__':
     col_names = ['uid', 'sid', 'time']
     all_data = reviews_df.loc[:, col_names]
 
-    # print(len(pd.unique(all_data['uid'])))
-    # print(len(pd.unique(all_data['sid'])))
-    # print(len(all_data))
-    # time.sleep(10000)
-
-    # indexItem = all_data[['time', 'sid']].groupby('sid').count() >= 15
-    # item = set(indexItem[indexItem['time'] == True].index)
-    # all_data = all_data[all_data['sid'].isin(item)]
-    # #
-    # indexUser = all_data[['time', 'uid']].groupby('uid').count() >= 8
-    # user = set(indexUser[indexUser['time'] == True].index)
-    # all_data = all_data[all_data['uid'].isin(user)]
-    # all_data = data_filter(all_data, 5, 5)
-    # print(all_data)
-
     mp_user = {uid: i for i, uid in enumerate(pd.unique(all_data.uid))}
     mp_item = {sid: i for i, sid in enumerate(pd.unique(all_data.sid))}
-    # all_data = remap_user_item(all_data, mp_user, mp_item)
-    # all_data.replace({'uid': mp_user, 'sid': mp_item}, inplace=True)
     all_data['uid'] = all_data['uid'].map(mp_user)
     all_data['sid'] = all_data['sid'].map(mp_item)
 

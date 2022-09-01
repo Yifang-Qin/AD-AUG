@@ -8,9 +8,7 @@ from MacridVAE import MacridVAE
 from utils import load_data, ndcg_binary_at_k_batch, recall_at_k_batch
 
 ARG = argparse.ArgumentParser()
-ARG.add_argument('--data', type=str, default='../../data/ml-100k',
-                 help='./data/ml-latest-small, ./data/ml-1m, '
-                      './data/ml-20m, or ./data/alishop-7c')
+ARG.add_argument('--data', type=str, default='../../data/ml-100k')
 ARG.add_argument('--mode', type=str, default='trn',
                  help='trn/tst/vis, for training/testing/visualizing.')
 ARG.add_argument('--logdir', type=str, default='./runs/')
@@ -132,7 +130,6 @@ Best Recall@50:        {}
 
             _, recon_loss, kl, reg_var = VAE(x, is_train=True)
             neg_elbo = recon_loss + anneal * kl
-            # neg_elbo = recon_loss + anneal * kl + reg_var
 
             rec_losses.append(recon_loss.detach().cpu().numpy())
             kls.append(kl.detach().cpu().numpy())
@@ -176,7 +173,7 @@ Best Recall@50:        {}
 
 
 if __name__ == '__main__':
-    # seed_torch(ARG.seed)
+    seed_torch(ARG.seed)
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     (n_users, n_items, train_data, valid_data, test_data) = load_data(ARG.data)
     print(f'\nData loaded from `{ARG.data}` complete:\n')

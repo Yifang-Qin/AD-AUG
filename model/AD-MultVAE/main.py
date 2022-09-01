@@ -4,17 +4,15 @@ import os
 
 import numpy as np, scipy.sparse as sparse
 import torch, torch.optim as optim
-# from ADV import ADV
-from ADV_1 import ADV
+from D_MultVAE import ADV as ADV_D
+from M_MultVAE import ADV as ADV_M
 
 from torch.optim import lr_scheduler
 
 from utils import load_data, ndcg_binary_at_k_batch, recall_at_k_batch
 
 ARG = argparse.ArgumentParser()
-ARG.add_argument('--data', type=str, required=True,
-                 help='./data/ml-latest-small, ./data/ml-1m, '
-                      './data/ml-20m, or ./data/alishop-7c')
+ARG.add_argument('--data', type=str, required=True)
 ARG.add_argument('--model', type=str, default='multvae',
                  help='multvae, multdae')
 ARG.add_argument('--mode', type=str, default='trn',
@@ -36,8 +34,6 @@ ARG.add_argument('--decay_step', type=int, default=50,
                  help='learning rate decay step')
 ARG.add_argument('--rg', type=float, default=0.0,
                  help='L2 regularization.')
-# ARG.add_argument('--rg_aug', type=float, default=1e1,
-#                  help='L2 regularization for augmenter.')
 ARG.add_argument('--rg_aug', type=float, default=1e4,
                  help='L2 regularization for augmenter.')
 ARG.add_argument('--alpha', type=float, default=1,
@@ -50,16 +46,12 @@ ARG.add_argument('--beta', type=float, default=0.2,
                  help='Strength of disentanglement, in (0,oo).')
 ARG.add_argument('--tau_aug', type=float, default=1.0,
                  help='Temperature of Gumbel-Max reparametrization, in (0,oo).')
-# ARG.add_argument('--tau', type=float, default=0.1,
-#                  help='Temperature of sigmoid/softmax, in (0,oo).')
 ARG.add_argument('--std', type=float, default=0.075,
                  help='Standard deviation of the Gaussian prior.')
 ARG.add_argument('--dfac', type=int, default=100,
                  help='Dimension of each facet.')
 ARG.add_argument('--proj_hid', type=int, default=100,
                  help='Dimension of projection head.')
-# ARG.add_argument('--nogb', action='store_true', default=False,
-#                  help='Disable Gumbel-Softmax sampling.')
 ARG.add_argument('--intern', type=int, default=50,
                  help='Report interval.')
 ARG.add_argument('--log', type=str, default=None,
@@ -109,13 +101,11 @@ def valid_vae(vad_data_tr, vad_data_te, model, arg, device):
             aug_graph[x == 1] = (x * gumbel)[x == 1]
 
         if arg.model == 'multvae':
-            # logits, _, _, _ = VAE(x, x, is_train=False)
             if arg.type == 'data':
                 logits, _, _, _ = VAE(x, x, is_train=False)
             elif arg.type == 'model':
                 logits, _, _, _ = VAE(aug_graph, x, is_train=False)
         elif arg.model == 'multdae':
-            # logits, _, _ = VAE(x, x, is_train=False)
             if arg.type == 'data':
                 logits, _, _ = VAE(x, x, is_train=False)
             elif arg.type == 'model':
@@ -153,7 +143,10 @@ Best Recall@50:        {}
     # n_item = train_data.shape[1]
     idxlist = list(range(n_train))
 
-    model = ADV(n_items, arg, device)
+    if arg.type == 'data':
+        model = ADV_D(n_items, arg, device).to(device)
+    elif arg.type == 'model':
+        model = ADV_M(n_items, arg, device).to(device)
 
     opt = optim.Adam(model.D.parameters(), lr=arg.lr, weight_decay=arg.rg)
     opt_aug = optim.Adam(model.G.parameters(), lr=arg.lr_aug, weight_decay=arg.rg)
@@ -187,7 +180,6 @@ Best Recall@50:        {}
             anneal = (min(arg.beta, 1. * update_count / total_anneal_steps)) \
                 if total_anneal_steps > 0 else arg.beta
             update_count += 1
-            # anneal = arg.beta
 
             rec_loss, aug_loss, mi_rec, mi_aug, recon, kl, reg_aug, drop, add = \
                 model(x, anneal, opt, opt_aug, is_train=True)
@@ -202,8 +194,6 @@ Best Recall@50:        {}
             drops.append(drop.detach().cpu().numpy())
             adds.append(add.detach().cpu().numpy())
 
-        # scheduler.step()
-        # scheduler_aug.step()
 
         ndcg100, recall20, recall50 = valid_vae(train_data, valid_data, model, arg, device)
         arg.rg_aug = arg.rg_aug * 0.999
@@ -244,7 +234,7 @@ Best Recall@50:        {}
 
 
 if __name__ == '__main__':
-    # seed_torch(ARG.seed)
+    seed_torch(ARG.seed)
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     (n_users, n_items, train_data, valid_data, test_data) = load_data(ARG.data)
     print(f'\nData loaded from `{ARG.data}` complete:\n')

@@ -9,9 +9,7 @@ from dae import MultDAE
 from utils import load_data, ndcg_binary_at_k_batch, recall_at_k_batch
 
 ARG = argparse.ArgumentParser()
-ARG.add_argument('--data', type=str, required=True,
-                 help='./data/ml-latest-small, ./data/ml-1m, '
-                      './data/ml-20m, or ./data/alishop-7c')
+ARG.add_argument('--data', type=str, required=True)
 ARG.add_argument('--model', type=str, default='multvae',
                  help='multvae, multdae')
 ARG.add_argument('--mode', type=str, default='trn',
@@ -31,16 +29,10 @@ ARG.add_argument('--keep', type=float, default=0.5,
                  help='Keep probability for dropout, in (0,1].')
 ARG.add_argument('--beta', type=float, default=0.2,
                  help='Strength of disentanglement, in (0,oo).')
-# ARG.add_argument('--tau', type=float, default=0.1,
-#                  help='Temperature of sigmoid/softmax, in (0,oo).')
 ARG.add_argument('--std', type=float, default=0.075,
                  help='Standard deviation of the Gaussian prior.')
-# ARG.add_argument('--kfac', type=int, default=7,
-#                  help='Number of facets (macro concepts).')
 ARG.add_argument('--dfac', type=int, default=100,
                  help='Dimension of each facet.')
-# ARG.add_argument('--nogb', action='store_true', default=False,
-#                  help='Disable Gumbel-Softmax sampling.')
 ARG.add_argument('--intern', type=int, default=50,
                  help='Report interval.')
 ARG.add_argument('--log', type=str, default=None,
@@ -184,7 +176,7 @@ Best Recall@50:        {}
 
 
 if __name__ == '__main__':
-    # seed_torch(ARG.seed)
+    seed_torch(ARG.seed)
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     (n_users, n_items, train_data, valid_data, test_data) = load_data(ARG.data)
     print(f'\nData loaded from `{ARG.data}` complete:\n')

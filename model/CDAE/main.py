@@ -1,19 +1,14 @@
 import argparse
 import random
 import os
-import time
 
 import numpy as np, scipy.sparse as sparse
-import torch, torch.nn as nn, torch.optim as optim
+import torch, torch.optim as optim
 from cdae import CDAE
 from utils import load_data, ndcg_binary_at_k_batch, recall_at_k_batch
 
 ARG = argparse.ArgumentParser()
-ARG.add_argument('--data', type=str, required=True,
-                 help='./data/ml-latest-small, ./data/ml-1m, '
-                      './data/ml-20m, or ./data/alishop-7c')
-# ARG.add_argument('--model', type=str, default='multdae',
-#                  help='multvae, multdae')
+ARG.add_argument('--data', type=str, required=True)
 ARG.add_argument('--mode', type=str, default='trn',
                  help='trn/tst/vis, for training/testing/visualizing.')
 ARG.add_argument('--logdir', type=str, default='./runs/')
@@ -31,16 +26,8 @@ ARG.add_argument('--keep', type=float, default=0.5,
                  help='Keep probability for dropout, in (0,1].')
 ARG.add_argument('--beta', type=float, default=0.2,
                  help='Strength of disentanglement, in (0,oo).')
-# ARG.add_argument('--tau', type=float, default=0.1,
-#                  help='Temperature of sigmoid/softmax, in (0,oo).')
-# ARG.add_argument('--std', type=float, default=0.075,
-#                  help='Standard deviation of the Gaussian prior.')
-# ARG.add_argument('--kfac', type=int, default=7,
-#                  help='Number of facets (macro concepts).')
 ARG.add_argument('--dfac', type=int, default=100,
                  help='Dimension of each facet.')
-# ARG.add_argument('--nogb', action='store_true', default=False,
-#                  help='Disable Gumbel-Softmax sampling.')
 ARG.add_argument('--intern', type=int, default=50,
                  help='Report interval.')
 ARG.add_argument('--log', type=str, default=None,
@@ -66,9 +53,6 @@ def valid_vae(vad_data_tr, vad_data_te, VAE, arg, device):
     for bnum, st_idx in enumerate(range(0, n_vad, arg.batch)):
         end_idx = min(st_idx + arg.batch, n_vad)
         x = vad_data_tr[idxlist_vad[st_idx:end_idx]]
-        # if sparse.isspmatrix(x):
-        #     x = x.toarray()
-        # x = torch.Tensor(x.astype(np.float32)).to(device)
         u = torch.LongTensor([idx for idx in idxlist_vad[st_idx:end_idx]]).to(device)
         logits, _ = VAE(u, x, is_train=False)
         logits[x.nonzero(as_tuple=True)] = -np.inf
@@ -98,13 +82,8 @@ Best Recall@50:        {}
 
     '''
     n_train = train_data.shape[0]
-    # n_valid = vad_data_tr.shape[0]
-    # n_items = train_data.shape[1]
-
     idxlist = list(range(n_train))
 
-    # num_batches = int(np.ceil(float(n) / arg.batch))
-    # total_anneal_steps = 5 * num_batches
 
     VAE = CDAE(arg, n_users, n_items, device).to(device)
 
@@ -152,12 +131,12 @@ Best Recall@50:        {}
             if arg.log is not None:
                 with open(arg.log, 'a') as f:
                     f.write(f'Epoch {epoch}\n\tRecon_loss: {np.mean(rec_losses)}, KL: {np.mean(kls)}, L2: {np.mean(regs)}')
-                    f.write(f_str.format(epoch+1, arg.epoch, \
+                    f.write(f_str.format(epoch+1, arg.epoch,
                         ndcg100, recall20, recall50, best_ndcg100, best_recall20, best_recall50))
                     f.write(f'NDCG100_test:\t{ndcg_te100}\nRecall20_test:\t{recall_te20}\nRecall50_test:\t{recall_te50}')
             else:
                 print(f'\nEpoch {epoch+1}\n\tRecon_loss: {np.mean(rec_losses)}, KL: {np.mean(kls)}, L2: {np.mean(regs)}')
-                print(f_str.format(epoch+1, arg.epoch, \
+                print(f_str.format(epoch+1, arg.epoch,
                         ndcg100, recall20, recall50, best_ndcg100, best_recall20, best_recall50))
                 print(f'NDCG100_test:\t{ndcg_te100}\nRecall20_test:\t{recall_te20}\nRecall50_test:\t{recall_te50}', flush=True)
 
@@ -169,7 +148,7 @@ Best Recall@50:        {}
 
 
 if __name__ == '__main__':
-    # seed_torch(ARG.seed)
+    seed_torch(ARG.seed)
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     (n_users, n_items, train_data, valid_data, test_data) = load_data(ARG.data)
     print(f'\nData loaded from `{ARG.data}` complete:\n')

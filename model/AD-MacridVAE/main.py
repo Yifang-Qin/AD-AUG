@@ -1,7 +1,6 @@
 import argparse
 import random
 import os
-import time
 
 import numpy as np
 from scipy import sparse
@@ -9,8 +8,8 @@ from scipy import sparse
 import torch
 import torch.optim as optim
 
-from ADV import ADV
-from ADV_1 import ADV_1
+from D_MacridVAE import ADV as ADV_D
+from M_MacridVAE import ADV as ADV_M
 from utils import load_data, ndcg_binary_at_k_batch, recall_at_k_batch
 from itertools import product
 
@@ -33,8 +32,6 @@ ARG.add_argument('--lr_aug', type=float, default=1e-3,
                  help='Learning rate of augmenter.')
 ARG.add_argument('--rg', type=float, default=0.0,
                  help='L2 regularization.')
-# ARG.add_argument('--rg_aug', type=float, default=1e1,
-#                  help='L2 regularization for augmenter.')
 ARG.add_argument('--rg_aug', type=float, default=1e3,
                  help='L2 regularization for augmenter.')
 ARG.add_argument('--alpha', type=float, default=1,
@@ -111,11 +108,6 @@ def valid_vae(vad_data_tr, vad_data_te, model, arg, device, save_emb):
     for bnum, st_idx in enumerate(range(0, n_vad, arg.batch)):
         end_idx = min(st_idx + arg.batch, n_vad)
         x = vad_data_tr[idxlist_vad[st_idx:end_idx]]
-        # if sparse.isspmatrix(x):
-        #     x = x.toarray()
-        # x = torch.Tensor(x.astype(np.float32)).to(device)
-
-        # logits, _, _, _ = VAE(x, x, is_train=False)
 
         if save_emb or arg.type == 'model':
             aug = model.G(x, x, is_train=False)
@@ -123,9 +115,6 @@ def valid_vae(vad_data_tr, vad_data_te, model, arg, device, save_emb):
             aug_graph = torch.zeros_like(x).to(device)
             aug_graph[x == 0] = (1 - (1 - x) * gumbel)[x == 0]
             aug_graph[x == 1] = (x * gumbel)[x == 1]
-            # z_aug = VAE.encode(aug_graph, is_train=False)
-            # z_augs.append(z_aug)
-        # logits, _, _, _ = VAE(aug_graph, x, is_train=False)
         if arg.type == 'data':
             logits, _, _, _ = VAE(x, x, is_train=False)
         elif arg.type == 'model':
@@ -143,35 +132,7 @@ def valid_vae(vad_data_tr, vad_data_te, model, arg, device, save_emb):
             recall_at_k_batch(logits.cpu().detach().numpy(), vad_data_te[idxlist_vad[st_idx:end_idx]], 50)
         )
 
-    # logits_aug = torch.cat(logits_aug, dim=0)
-    # target = logits_aug[640, :]
-    # sorted, indices = torch.sort(target, descending=True)
-    # zero_indices = (x[640, :]==0).nonzero(as_tuple=True)[0]
-    # one_indices = (x[640, :]==1).nonzero(as_tuple=True)[0]
-    # indices = list(indices.cpu().numpy())
-    # zero_indices = list(zero_indices.cpu().numpy())
-    # one_indices = list(one_indices.cpu().numpy())
-    # zero_idx = []
-    # one_idx = []
-    # for idx in indices:
-    #     if idx in zero_indices:
-    #         if len(zero_idx) == 5:
-    #             continue
-    #         zero_idx.append(idx)
-    #     if idx in one_indices:
-    #         if len(one_idx) == 5:
-    #             continue
-    #         one_idx.append(idx)
-    #
-    # print(indices)
-    # print(zero_indices)
-    # print(one_indices)
-    # print(zero_idx)
-    # print(one_idx)
-    # time.sleep(100)
     if save_emb:
-        # z = torch.cat(z_augs, dim=1).transpose(0, 1).reshape(-1, arg.kfac*arg.dfac)
-        # z = torch.cat(z_augs, dim=1).view(-1, arg.dfac)
         z = torch.cat(z_augs, dim=1)
         if arg.type == 'data':
             np.save('z_data.npy', z.detach().cpu().numpy())
@@ -204,15 +165,11 @@ Best Recall@50:        {}
     idxlist = list(range(n_train))
 
     if arg.type == 'data':
-        model = ADV(n_items, arg, device).to(device)
+        model = ADV_D(n_items, arg, device).to(device)
     elif arg.type == 'model':
-        model = ADV_1(n_items, arg, device).to(device)
-
-    # if arg.save_name is not None:
-    #     torch.save(model, './saved_models/'+arg.save_name+'_template.pth')
+        model = ADV_M(n_items, arg, device).to(device)
 
     opt = optim.Adam(model.D.parameters(), lr=arg.lr, weight_decay=arg.rg)
-    # opt_aug = optim.Adam(list(model.G_add.parameters()) + list(model.G_del.parameters()), lr=arg.lr_aug, weight_decay=arg.rg)
     opt_aug = optim.Adam(model.G.parameters(), lr=arg.lr_aug, weight_decay=arg.rg)
 
     best_epoch = -1
@@ -255,8 +212,7 @@ Best Recall@50:        {}
             drops.append(drop.detach().cpu().numpy())
             adds.append(add.detach().cpu().numpy())
 
-        # arg.rg_aug = arg.rg_aug * 0.999
-        # arg.rg_aug = random.uniform(0, arg.rg_aug_or)
+        arg.rg_aug = arg.rg_aug * 0.999
         ndcg100, recall20, recall50 = valid_vae(train_data, valid_data, model, arg, device, False)
 
         if ndcg100 > best_ndcg100:
@@ -265,22 +221,21 @@ Best Recall@50:        {}
             best_recall50 = recall50
             best_epoch = epoch
             if arg.save_name is not None:
-                # torch.save(model.state_dict(), './saved_models/' + arg.save_name + '_args.pth')
                 torch.save(model.state_dict(), arg.save_name)
             ndcg_te100, recall_te20, recall_te50 = valid_vae(train_data, test_data, model, arg, device, False)
 
         if (epoch + 1) % arg.intern == 0:
             if arg.log is not None:
                 with open(arg.log, 'a') as f:
-                    f.write(f_str.format(epoch + 1, arg.epoch, np.mean(rec_losses), \
-                                         np.mean(recons), np.mean(kls), np.mean(mi_recs), \
-                                         np.mean(aug_losses), np.mean(mi_augs), np.mean(reg_augs), \
+                    f.write(f_str.format(epoch + 1, arg.epoch, np.mean(rec_losses),
+                                         np.mean(recons), np.mean(kls), np.mean(mi_recs),
+                                         np.mean(aug_losses), np.mean(mi_augs), np.mean(reg_augs),
                                          ndcg100, recall20, recall50, best_ndcg100, best_recall20, best_recall50))
                     f.write(f'NDCG100_test:\t{ndcg_te100}\nRecall20_test:\t{recall_te20}\nRecall50_test:\t{recall_te50}\n')
             else:
-                print(f_str.format(epoch + 1, arg.epoch, np.mean(rec_losses), \
-                                   np.mean(recons), np.mean(kls), np.mean(mi_recs), \
-                                   np.mean(aug_losses), np.mean(mi_augs), np.mean(reg_augs), \
+                print(f_str.format(epoch + 1, arg.epoch, np.mean(rec_losses),
+                                   np.mean(recons), np.mean(kls), np.mean(mi_recs),
+                                   np.mean(aug_losses), np.mean(mi_augs), np.mean(reg_augs),
                                    ndcg100, recall20, recall50, best_ndcg100, best_recall20, best_recall50))
                 print(f'NDCG100_test:\t{ndcg_te100}\nRecall20_test:\t{recall_te20}\nRecall50_test:\t{recall_te50}')
                 print(f'Drop: {np.mean(drops)}\tAdds:{np.mean(adds)}', flush=True)
@@ -294,7 +249,7 @@ Best Recall@50:        {}
 
 
 if __name__ == '__main__':
-    # seed_torch(ARG.seed)
+    seed_torch(ARG.seed)
     if ARG.cudaID is not None:
         device = torch.device(f'cuda:{ARG.cudaID}')
     else:
@@ -306,35 +261,20 @@ if __name__ == '__main__':
           f'\n\tTest size: {test_data.shape[0]}\n')
 
     if ARG.mode == 'trn':
-        if ARG.search:
-            params = dict(
-                lr=[1e-3, 5e-4],
-                lr_aug=[1e-3, 5e-4],
-                rg_aug=list(np.linspace(4, 7, 10)),
-                batch=[256, 1024],
-            )
-            for lr, lr_aug, rg_aug, batch in product(*[pa for pa in params.values()]):
-                print('\nStart Training with: ')
-                ARG.lr, ARG.lr_aug, ARG.rg_aug, ARG.batch = lr, lr_aug, rg_aug, batch
-                print(print_arg(ARG), flush=True)
-                ndcg_te100, recall_te20, recall_te50 = train(train_data, valid_data, test_data, ARG, device)
-                print(f'Best test NDCG@100:{ndcg_te100}\nBest test recall@20:{recall_te20}\n'
-                      f'Best test recall@50: {recall_te50}', flush=True)
-        else:
-            print('\nStart Training with: ')
-            print(print_arg(ARG), flush=True)
-            ndcg_te100, recall_te20, recall_te50 = train(train_data, valid_data, test_data, ARG, device)
-            print(f'Best test NDCG@100:{ndcg_te100}\nBest test recall@20:{recall_te20}\nBest test recall@50: {recall_te50}',
-                  flush=True)
+        print('\nStart Training with: ')
+        print(print_arg(ARG), flush=True)
+        ndcg_te100, recall_te20, recall_te50 = train(train_data, valid_data, test_data, ARG, device)
+        print(f'Best test NDCG@100:{ndcg_te100}\nBest test recall@20:{recall_te20}\nBest test recall@50: {recall_te50}',
+              flush=True)
             # print(f'Best NDCG:{best_ndcg}\n', flush=True)
     else:
         if sparse.isspmatrix(train_data):
             train_data = train_data.toarray()
         train_data = torch.Tensor(train_data.astype(np.float32)).to(device)
         if ARG.type == 'data':
-            model = ADV(n_items, ARG, device).to(device)
+            model = ADV_D(n_items, ARG, device).to(device)
         elif ARG.type == 'model':
-            model = ADV_1(n_items, ARG, device).to(device)
+            model = ADV_M(n_items, ARG, device).to(device)
         model.load_state_dict(torch.load(ARG.save_name))
         ndcg100, recall20, recall50 = valid_vae(train_data, test_data, model, ARG, device, True)
         print(ndcg100, recall20, recall50)

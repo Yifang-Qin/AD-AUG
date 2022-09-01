@@ -4,10 +4,8 @@ import numpy as np
 def load_data(path, col_names):
     all_data = pd.read_csv(path, sep='::', header=None, names=col_names)
     all_data = all_data.loc[:, ['uid', 'sid', 'time']]
-    # print(all_data['uid'])
     all_data['uid'] -= 1
     all_data['sid'] -= 1
-    # all_data.sort_values(by='time', ascending=True)
     return all_data
 
 def data_split(all_data, train_ratio, valid_ratio, test_ratio):
@@ -62,14 +60,12 @@ def remap_user_item(data, mp_item):
     return dd
 
 if __name__ == '__main__':
-    # file_path = './ml-1m/ratings.dat'
-    root_path = ''
-    file_path = root_path + 'ml-1m_1/ml-1m/ratings.dat'
+    root_path = './'
+    file_path = root_path + 'ml-1m/ratings.dat'
     col_names = ['uid', 'sid', 'score', 'time']
     all_data = load_data(file_path, col_names)
 
     mp_item = {sid: i for i, sid in enumerate(pd.unique(all_data.sid))}
-    # mp_user = {uid: i for i, uid in enumerate(pd.unique(all_data.uid))}
     all_data = remap_user_item(all_data, mp_item)
 
     train_data, valid_data, test_data = data_split(all_data, 0.8, 0.1, 0.1)

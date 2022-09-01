@@ -4,14 +4,12 @@ import os
 
 import numpy as np, scipy.sparse as sparse
 import torch, torch.optim as optim
-# from ADV import ADV
-from ADV_1 import ADV
+from D_CDAE import ADV as ADV_D
+from M_CDAE import ADV as ADV_M
 from utils import load_data, ndcg_binary_at_k_batch, recall_at_k_batch
 
 ARG = argparse.ArgumentParser()
-ARG.add_argument('--data', type=str, required=True,
-                 help='./data/ml-latest-small, ./data/ml-1m, '
-                      './data/ml-20m')
+ARG.add_argument('--data', type=str, required=True)
 ARG.add_argument('--mode', type=str, default='trn',
                  help='trn/tst/vis, for training/testing/visualizing.')
 ARG.add_argument('--logdir', type=str, default='./runs/')
@@ -19,6 +17,8 @@ ARG.add_argument('--seed', type=int, default=98765,
                  help='Random seed. Ignored if < 0.')
 ARG.add_argument('--epoch', type=int, default=5000,
                  help='Number of training epochs.')
+ARG.add_argument('--type', type=str, default='data',
+                 help='data/model')
 ARG.add_argument('--batch', type=int, default=1024,
                  help='Training batch size.')
 ARG.add_argument('--lr', type=float, default=1e-3,
@@ -27,8 +27,6 @@ ARG.add_argument('--lr_aug', type=float, default=1e-3,
                  help='Learning rate of augmenter.')
 ARG.add_argument('--rg', type=float, default=0.0,
                  help='L2 regularization.')
-# ARG.add_argument('--rg_aug', type=float, default=1e1,
-#                  help='L2 regularization for augmenter.')
 ARG.add_argument('--rg_aug', type=float, default=1e4,
                  help='L2 regularization for augmenter.')
 ARG.add_argument('--alpha', type=float, default=1,
@@ -143,7 +141,10 @@ Best Recall@50:        {}
     # n_item = train_data.shape[1]
     idxlist = list(range(n_train))
 
-    model = ADV(n_users, n_items, arg, device).to(device)
+    if arg.type == 'data':
+        model = ADV_D(n_users, n_items, arg, device).to(device)
+    elif arg.type == 'model':
+        model = ADV_M(n_users, n_items, arg, device).to(device)
 
     opt = optim.Adam(model.D.parameters(), lr=arg.lr, weight_decay=arg.rg)
     opt_aug = optim.Adam(model.G.parameters(), lr=arg.lr_aug, weight_decay=arg.rg)
@@ -162,16 +163,7 @@ Best Recall@50:        {}
     train_data = torch.Tensor(train_data.astype(np.float32)).to(device)
     arg.rg_aug_or = arg.rg_aug
 
-    # if sparse.isspmatrix(valid_data):
-    #     valid_data = valid_data.toarray()
-    # valid_data = torch.Tensor(valid_data.astype(np.float32))
-    #
-    # if sparse.isspmatrix(test_data):
-    #     test_data = test_data.toarray()
-    # test_data = torch.Tensor(test_data.astype(np.float32))
-
     for epoch in range(arg.epoch):
-        # print(epoch)
         np.random.shuffle(idxlist)
         rec_losses, aug_losses, mi_recs, mi_augs = [], [], [], []
         recons, kls, reg_augs, drops, adds = [], [], [], [], []
@@ -200,7 +192,6 @@ Best Recall@50:        {}
 
         ndcg100, recall20, recall50 = valid_vae(train_data, valid_data, model, arg, device)
         arg.rg_aug = arg.rg_aug * 0.999
-        # arg.rg_aug = random.uniform(0, arg.rg_aug_or)
 
         if ndcg100 > best_ndcg100:
             best_ndcg100 = ndcg100
@@ -214,16 +205,16 @@ Best Recall@50:        {}
         if (epoch + 1) % arg.intern == 0:
             if arg.log is not None:
                 with open(arg.log, 'a') as f:
-                    f.write(f_str.format(epoch + 1, arg.epoch, np.mean(rec_losses), \
-                                         np.mean(recons), np.mean(kls), np.mean(mi_recs), \
-                                         np.mean(aug_losses), np.mean(mi_augs), np.mean(reg_augs), \
+                    f.write(f_str.format(epoch + 1, arg.epoch, np.mean(rec_losses),
+                                         np.mean(recons), np.mean(kls), np.mean(mi_recs),
+                                         np.mean(aug_losses), np.mean(mi_augs), np.mean(reg_augs),
                                          ndcg100, recall20, recall50, best_ndcg100, best_recall20, best_recall50))
                     f.write(
                         f'NDCG100_test:\t{ndcg_te100}\nRecall20_test:\t{recall_te20}\nRecall50_test:\t{recall_te50}\n')
             else:
-                print(f_str.format(epoch + 1, arg.epoch, np.mean(rec_losses), \
-                                   np.mean(recons), np.mean(kls), np.mean(mi_recs), \
-                                   np.mean(aug_losses), np.mean(mi_augs), np.mean(reg_augs), \
+                print(f_str.format(epoch + 1, arg.epoch, np.mean(rec_losses),
+                                   np.mean(recons), np.mean(kls), np.mean(mi_recs),
+                                   np.mean(aug_losses), np.mean(mi_augs), np.mean(reg_augs),
                                    ndcg100, recall20, recall50, best_ndcg100, best_recall20, best_recall50))
                 print(f'NDCG100_test:\t{ndcg_te100}\nRecall20_test:\t{recall_te20}\nRecall50_test:\t{recall_te50}')
                 print(f'Drop: {np.mean(drops)}\tAdds:{np.mean(adds)}', flush=True)
@@ -237,7 +228,7 @@ Best Recall@50:        {}
 
 
 if __name__ == '__main__':
-    # seed_torch(ARG.seed)
+    seed_torch(ARG.seed)
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     (n_users, n_items, train_data, valid_data, test_data) = load_data(ARG.data)
     print(f'\nData loaded from `{ARG.data}` complete:\n')
