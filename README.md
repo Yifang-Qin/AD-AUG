@@ -1,7 +1,5 @@
 ## AD-AUG
 
----
-
 This is the pytorch implementation for our ECML-PKDD 2022 paper:
 > Yifan Wang, Yifang Qin, Yu Han, Mingyang Yin, Jingren Zhou, Hongxia Yang, and Ming Zhang(2022). AD-AUG: Adversarial Data Augmentation for
 Counterfactual Recommendation
@@ -13,8 +11,6 @@ Please cite our paper if you use the code.
 
 ### Environment Requirement
 
----
-
 The code has been tested running under Python 3.9.7. The required packages are as follows:
 
 - pytorch == 1.7.1 
@@ -24,7 +20,6 @@ The code has been tested running under Python 3.9.7. The required packages are a
 
 ### File Structure
 
----
 
 ```
 AD-AUG
@@ -45,8 +40,6 @@ As listed above, there are two main directories that contain the codes for data 
 Under `./model`, we implement all the compared baselines and the AD-AUG augmented version of the AE-based baselines `X` under the directory named by `AD-X`,
 
 ### Running Example
-
----
 
 For example, to generate `ML-1M` data for AD-AUG models, run:
 ```shell
