@@ -1,6 +1,6 @@
 ## AD-AUG
 
-This is the pytorch implementation for our ECML-PKDD 2022 paper:
+This is the pytorch implementation for our ECML-PKDD 2022 [paper](https://2022.ecmlpkdd.org/wp-content/uploads/2022/09/sub_896.pdf):
 > Yifan Wang, Yifang Qin, Yu Han, Mingyang Yin, Jingren Zhou, Hongxia Yang, and Ming Zhang(2022). AD-AUG: Adversarial Data Augmentation for
 Counterfactual Recommendation
 
